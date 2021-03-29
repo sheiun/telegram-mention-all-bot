@@ -10,11 +10,19 @@ config = load(open("config.json"))
 chatid_usersid: dict[str, list[int]] = load(open("chatid_usersid.json"))
 
 
-def tag_user(user, parse_mode: str = ParseMode.MARKDOWN):
+def tag_user(user, parse_mode: str = ParseMode.MARKDOWN) -> str:
     if parse_mode == ParseMode.MARKDOWN:
-        return f"[{user.first_name}](tg://user?id={user.id})"
+        return f"[{user.first_name} {user.last_name}](tg://user?id={user.id})"
     if parse_mode == ParseMode.HTML:
         return f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
+    raise NotImplementedError(parse_mode + " is not supported!")
+
+
+def tag_user_empty(user, parse_mode: str = ParseMode.MARKDOWN) -> str:
+    if parse_mode == ParseMode.MARKDOWN:
+        return f"[\u200b](tg://user?id={user.id})"
+    if parse_mode == ParseMode.HTML:
+        return f"<a href='tg://user?id={user.id}'>\u200b</a>"
     raise NotImplementedError(parse_mode + " is not supported!")
 
 
@@ -26,6 +34,8 @@ def update_chatid_usersid(chat_id: int, link: str):
 
 
 def mention_all(update: Update, context: CallbackContext) -> None:
+    if not update.message:
+        return
     if any(filter(lambda x: x in update.message.text, config["keywords"])):
         chat = update.message.chat
         global chatid_usersid
@@ -45,29 +55,28 @@ def mention_all(update: Update, context: CallbackContext) -> None:
                 users.append(user)
             except BadRequest:
                 pass
-        text = ""
+        tag_text = ""
         for user in users:
             if user == update.message.from_user:
                 continue
-            text += tag_user(user) + " "
-
+            tag_text += tag_user_empty(user)
         try:
             update.message.delete()
-            replaced_text = update.message.text
-            for keyword in config["keywords"]:
-                replaced_text = replaced_text.replace(keyword, text.rstrip())
-            text = f"{tag_user(update.message.from_user)}：{replaced_text}"
             context.bot.send_message(
-                chat.id, text=text, parse_mode=ParseMode.MARKDOWN,
+                chat.id,
+                text=f"{tag_user(update.message.from_user)}: {update.message.text}{tag_text}",
+                parse_mode=ParseMode.MARKDOWN,
             )
         except BadRequest:
-            update.message.reply_text(text.rstrip(), parse_mode=ParseMode.MARKDOWN)
+            update.message.reply_text(
+                f"通知了其他 {len(users)} 個人！" + tag_text.rstrip(),
+                parse_mode=ParseMode.MARKDOWN,
+            )
 
 
 def main() -> None:
     """Start the bot."""
     c = get_client(config)
-    c.start()
     c.disconnect()
 
     updater = Updater(config["token"])
