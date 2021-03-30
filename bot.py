@@ -12,7 +12,9 @@ chatid_usersid: dict[str, list[int]] = load(open("chatid_usersid.json"))
 
 def tag_user(user, parse_mode: str = ParseMode.MARKDOWN) -> str:
     if parse_mode == ParseMode.MARKDOWN:
-        return f"[{user.first_name} {user.last_name}](tg://user?id={user.id})"
+        return (
+            f"[{user.first_name or ''} {user.last_name or ''}](tg://user?id={user.id})"
+        )
     if parse_mode == ParseMode.HTML:
         return f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
     raise NotImplementedError(parse_mode + " is not supported!")
